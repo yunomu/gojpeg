@@ -9,7 +9,7 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
-var zzOrder []int = []int{
+var unzig []int = []int{
 	0, 1, 5, 6, 14, 15, 27, 28,
 	2, 4, 7, 13, 16, 26, 29, 42,
 	3, 8, 12, 17, 25, 30, 41, 43,
@@ -20,9 +20,9 @@ var zzOrder []int = []int{
 	35, 36, 48, 49, 57, 58, 62, 63,
 }
 
-func zzToMatrix(zz []int16) *mat.Dense {
-	var data [64]float64
-	for i, n := range zzOrder {
+func zzToMatrix(zz block) *mat.Dense {
+	var data [blockSize]float64
+	for i, n := range unzig {
 		data[i] = float64(zz[n])
 	}
 
@@ -135,7 +135,7 @@ func getComponentParams(
 	var nmcu int
 	for _, p := range ret {
 		tx := 8 * int(p.h)
-		ty := 8 * int(p.y)
+		ty := 8 * int(p.v)
 		n := padding(tx, int(p.x)) * padding(ty, int(p.y)) / (tx * ty)
 		if nmcu == 0 {
 			nmcu = n
@@ -221,7 +221,7 @@ func extend(v_ uint8, t int) int16 {
 	return v
 }
 
-func (d *Decoder) decodeDC(ht *hufftable, pred int16) (int16, error) {
+func (d *Decoder) decodeDC(ht *hufftable) (int16, error) {
 	l_, err := d.decodeHuffval(ht)
 	if err != nil {
 		return 0, err
@@ -236,7 +236,7 @@ func (d *Decoder) decodeDC(ht *hufftable, pred int16) (int16, error) {
 		return 0, err
 	}
 
-	return extend(v, l) + pred, nil
+	return extend(v, l), nil
 }
 
 type ob uint8
@@ -254,14 +254,14 @@ func (d *Decoder) decodeZZ(ssss int) (int16, error) {
 	return extend(v, ssss), nil
 }
 
-func (d *Decoder) decodeACs(ht *hufftable) ([]int16, error) {
+func (d *Decoder) decodeACs(ht *hufftable) (block, error) {
 	k := 1
-	var zz [64]int16
+	var zz block
 
 	for {
 		rs, err := d.decodeHuffval(ht)
 		if err != nil {
-			return nil, err
+			return block{}, err
 		}
 
 		ssss := int(rs % 16)
@@ -280,7 +280,7 @@ func (d *Decoder) decodeACs(ht *hufftable) ([]int16, error) {
 
 		v, err := d.decodeZZ(ssss)
 		if err != nil {
-			return nil, err
+			return block{}, err
 		}
 		zz[k] = v
 
@@ -290,7 +290,7 @@ func (d *Decoder) decodeACs(ht *hufftable) ([]int16, error) {
 		k++
 	}
 
-	return zz[:], nil
+	return zz, nil
 }
 
 func levelShift(p uint8, a mat.Matrix) mat.Matrix {
@@ -298,7 +298,7 @@ func levelShift(p uint8, a mat.Matrix) mat.Matrix {
 
 	var ret mat.Dense
 	ret.Apply(func(i, j int, v float64) float64 {
-		v = math.Round(v)
+		v = math.Trunc(v)
 		if v <= (-s) {
 			return 0
 		} else if v >= s {
@@ -310,39 +310,36 @@ func levelShift(p uint8, a mat.Matrix) mat.Matrix {
 	return &ret
 }
 
-type block [][]int16
+const blockSize = 64
 
-var mx, mn float64
+type block [blockSize]int16
 
-func roundArray(a mat.Matrix) block {
-	var ret [8][]int16
+func reconstruct(a mat.Matrix) block {
+	var ret block
 	for y := 0; y < 8; y++ {
 		for x := 0; x < 8; x++ {
 			v := a.At(y, x)
-			mx = max(mx, v)
-			mn = min(mn, v)
-			slog.Debug("unit", "v", v)
-			ret[y] = append(ret[y], int16(v))
+			ret[y*8+x] = int16(v)
 		}
 	}
-	slog.Debug("unit", "array", ret)
-	return ret[:]
+	return ret
 }
 
 func (d *Decoder) decodeDataUnit(param *componentParam, p uint8) (block, error) {
-	dc, err := d.decodeDC(param.dcHT, d.pred)
+	dc, err := d.decodeDC(param.dcHT)
 	if err != nil {
-		return nil, err
+		return block{}, err
 	}
-	d.pred = dc
+	d.pred[param.cs] += dc
 
 	zz, err := d.decodeACs(param.acHT)
 	if err != nil {
-		return nil, err
+		return block{}, err
 	}
-	zz[0] = dc
+	zz[0] = d.pred[param.cs]
 
-	return roundArray(levelShift(p, idct_(zzToMatrix(param.qt.Unquantize(zz))))), nil
+	ret := reconstruct(levelShift(p, idct_(zzToMatrix(param.qt.Unquantize(zz)))))
+	return ret, nil
 }
 
 func (d *Decoder) decodeMCU(params []*componentParam, p uint8) ([][]block, error) {
@@ -371,7 +368,7 @@ func (d *Decoder) decodeMCU(params []*componentParam, p uint8) ([][]block, error
 }
 
 func (d *Decoder) decodeRestartInterval(params []*componentParam, nmcu int, ri int, p uint8) ([][]block, error) {
-	d.pred = 0
+	d.pred = make(map[uint8]int16)
 
 	var cnt, rst int
 	ret := make([][]block, len(params))
@@ -387,7 +384,7 @@ func (d *Decoder) decodeRestartInterval(params []*componentParam, nmcu int, ri i
 
 		cnt++
 		if cnt == ri {
-			d.pred = 0
+			d.pred = make(map[uint8]int16)
 
 			m, err := d.readMarker()
 			if err != nil {
@@ -432,7 +429,6 @@ func (d *Decoder) decodeScan(frameHeader *frameHeader, misc *miscTables) (map[ui
 	for {
 		components, err := d.decodeRestartInterval(params, nmcu, misc.interval, frameHeader.p)
 		if err == ErrUnexpectedMarker {
-			slog.Info("mxmn", "max", mx, "min", mn)
 			d.unread()
 			return ret, nil
 		} else if err == EOS {

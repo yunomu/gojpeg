@@ -18,13 +18,13 @@ func (t *quantizationTable) String() string {
 	return fmt.Sprintf("(Pq=%d Tq=%d Q=%v)", t.precision, t.target, t.qs)
 }
 
-func (t *quantizationTable) Unquantize(zz []int16) []int16 {
-	var ret [64]int16
+func (t *quantizationTable) Unquantize(zz block) block {
+	var ret block
 	for i, q := range t.qs {
 		ret[i] = zz[i] * int16(q)
 	}
 
-	return ret[:]
+	return ret
 }
 
 func (d *Decoder) readQT() (*quantizationTable, int, error) {

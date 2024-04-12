@@ -1,6 +1,7 @@
 package decoder
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 )
@@ -193,7 +194,10 @@ func (d *Decoder) decodeHuffval(
 	}
 
 	for {
-		maxcd := ht.maxcode[l]
+		maxcd, ok := ht.maxcode[l]
+		if !ok {
+			return 0, errors.New("unexpected length in maxcode")
+		}
 		if int(code) <= maxcd {
 			break
 		}
@@ -207,7 +211,10 @@ func (d *Decoder) decodeHuffval(
 		code = (code << 1) + nextbit
 	}
 
-	mincd := ht.mincode[l]
+	mincd, ok := ht.mincode[l]
+	if !ok {
+		return 0, errors.New("unexpected length in mincode")
+	}
 	j := ht.valptr[l]
 	j += int(code) - int(mincd)
 	val := ht.huffcodes[j].value

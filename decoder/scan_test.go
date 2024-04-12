@@ -77,13 +77,13 @@ func TestExtend(t *testing.T) {
 }
 
 func TestZZMatrix(t *testing.T) {
-	var zz []int16
+	var zz block
 	for i := int16(0); i < 64; i++ {
-		zz = append(zz, i)
+		zz[i] = i
 	}
 
 	act := zzToMatrix(zz)
-	for i, v := range zzOrder {
+	for i, v := range unzig {
 		y := i / 8
 		x := i % 8
 		if float64(v) != act.At(y, x) {

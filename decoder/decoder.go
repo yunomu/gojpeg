@@ -20,7 +20,7 @@ type Decoder struct {
 	bits    uint8
 	numLine uint16
 
-	pred int16
+	pred map[uint8]int16
 }
 
 func New(r io.Reader) *Decoder {
@@ -285,7 +285,7 @@ func (d *Decoder) readSOI() error {
 	}
 
 	if m != Marker_SOI {
-		slog.Debug("readSOI() unexpected marker", "marker", m)
+		slog.Error("readSOI() unexpected marker", "marker", m)
 		return ErrUnexpectedMarker
 	}
 
@@ -299,7 +299,7 @@ func (d *Decoder) readEOI() error {
 	}
 
 	if m != Marker_EOI {
-		slog.Debug("readEOI() unexpected marker", "marker", m)
+		slog.Error("readEOI() unexpected marker", "marker", m)
 		return ErrUnexpectedMarker
 	}
 

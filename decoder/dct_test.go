@@ -668,3 +668,41 @@ func BenchmarkDCTMAT0(b *testing.B) {
 		dctmat0(a)
 	}
 }
+
+func matRound(m mat.Matrix) *mat.Dense {
+	var ret mat.Dense
+	ret.Apply(func(i, j int, v float64) float64 {
+		return math.Round(v)
+	}, m)
+	return &ret
+}
+
+func TestIDCT_Value0(t *testing.T) {
+	raw := mat.NewDense(8, 8, []float64{328, 0, 10, 0, 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, -7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+	exp := mat.NewDense(8, 8, []float64{45, 44, 42, 41, 41, 42, 44, 45, 45, 44, 43, 42, 42, 43, 44, 45, 45, 44, 43, 42, 42, 43, 44, 45, 44, 43, 42, 41, 41, 42, 43, 44, 43, 42, 41, 40, 40, 41, 42, 43, 41, 40, 39, 38, 38, 39, 40, 41, 40, 39, 37, 36, 36, 37, 39, 40, 38, 37, 36, 35, 35, 36, 37, 38})
+
+	r := idct_(raw)
+	act := matRound(r)
+
+	if !mat.Equal(exp, act) {
+		t.Logf("exp=%v", exp)
+		t.Logf("act=%v", act)
+		t.Logf("r=\n%v", mat.Formatted(r))
+		t.Errorf("mismatch")
+	}
+}
+
+func TestIDCT_Value150(t *testing.T) {
+	raw := mat.NewDense(8, 8, []float64{288, -6, 10, 0, 0, 0, 0, 0, -6, 0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+	exp := mat.NewDense(8, 8, []float64{38, 37, 36, 35, 34, 35, 36, 37, 37, 36, 35, 34, 34, 35, 37, 38, 35, 34, 33, 33, 34, 35, 37, 38, 34, 33, 32, 32, 34, 35, 38, 39, 34, 34, 33, 33, 34, 36, 38, 39, 36, 35, 34, 34, 35, 36, 38, 39, 39, 38, 36, 36, 36, 37, 38, 39, 40, 39, 38, 37, 36, 37, 38, 39})
+
+	r := idct_(raw)
+	act := matRound(r)
+
+	if !mat.Equal(exp, act) {
+		t.Logf("exp=%v", exp)
+		t.Logf("act=%v", act)
+		t.Logf("r=%v", r)
+		t.Errorf("mismatch")
+	}
+}

@@ -22,12 +22,13 @@ type frameHeader struct {
 	marker     Marker
 	p          uint8
 	y, x       uint16
+	nf         uint8
 	hMax, vMax uint8
 	params     []*frameComponentParam
 }
 
 func (h *frameHeader) String() string {
-	return fmt.Sprintf("(marker=%v p=%d (x, y)=(%d, %d) params=%v)", h.marker, h.p, h.x, h.y, h.params)
+	return fmt.Sprintf("(marker=%v p=%d (x, y)=(%d, %d) Nf=%d params=%v)", h.marker, h.p, h.x, h.y, h.nf, h.params)
 }
 
 func (d *Decoder) readFrameHeader() (*frameHeader, error) {
@@ -106,6 +107,7 @@ func (d *Decoder) readFrameHeader() (*frameHeader, error) {
 		p:      p,
 		y:      y,
 		x:      x,
+		nf:     nf,
 		hMax:   hmax,
 		vMax:   vmax,
 		params: params,
@@ -114,7 +116,6 @@ func (d *Decoder) readFrameHeader() (*frameHeader, error) {
 	slog.Info("frame header",
 		"header", ret,
 		"Lf", lf,
-		"Nf", nf,
 	)
 
 	return ret, nil
